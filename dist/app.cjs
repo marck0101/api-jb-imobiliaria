@@ -1,0 +1,1888 @@
+"use strict";
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+// src/app.ts
+var app_exports = {};
+__export(app_exports, {
+  app: () => app2
+});
+module.exports = __toCommonJS(app_exports);
+var import_dotenv2 = __toESM(require("dotenv"), 1);
+var import_path2 = __toESM(require("path"), 1);
+var import_express2 = __toESM(require("express"), 1);
+
+// src/http/routes.ts
+var import_express = require("express");
+
+// src/models/admin.ts
+var import_mongoose = require("mongoose");
+var schema = new import_mongoose.Schema({
+  archivedAt: Date,
+  name: {
+    type: String,
+    required: true
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  password: {
+    type: String,
+    required: true
+  },
+  status: {
+    type: String,
+    enum: ["ACTIVE", "PENDING", "BLOCKED"],
+    default: "ACTIVE"
+  }
+}, { timestamps: true });
+var Admins = (0, import_mongoose.model)("Admins", schema);
+
+// src/models/logs.ts
+var import_mongoose2 = require("mongoose");
+var schema2 = new import_mongoose2.Schema({
+  level: String,
+  message: String,
+  data: Object,
+  path: String,
+  timestamp: {
+    type: Date,
+    default: Date.now
+  }
+}, { timestamps: true });
+var Logs = (0, import_mongoose2.model)("Logs", schema2);
+
+// src/utils/logger.ts
+var import_winston = __toESM(require("winston"), 1);
+var LOGS_LEVELS = {
+  emergency: 0,
+  //system is unusable
+  alert: 1,
+  //action must be taken immediately
+  critical: 2,
+  //critical conditions
+  error: 3,
+  //error conditions
+  warning: 4,
+  //warning conditions
+  notice: 5,
+  //normal but significant condition
+  info: 6,
+  //informational messages
+  debug: 7
+  //debug level messages
+};
+var MongoTransport = class extends import_winston.default.Transport {
+  constructor(opts) {
+    super(opts);
+  }
+  async log(info, callback) {
+    setImmediate(() => {
+      this.emit("logged", info);
+    });
+    const log = new Logs({
+      level: info.level,
+      message: info.message,
+      data: info.data || {},
+      path: info.path,
+      timestamp: Date.now()
+    });
+    await log.save();
+    callback();
+  }
+};
+var logger = import_winston.default.createLogger({
+  levels: LOGS_LEVELS,
+  format: import_winston.format.combine(
+    import_winston.format.json()
+  ),
+  transports: [
+    new MongoTransport()
+  ]
+});
+var COLORS = {
+  emergency: "\x1B[41m",
+  alert: "\x1B[43m",
+  critical: "\x1B[41m",
+  error: "\x1B[41m",
+  warning: "\x1B[43m",
+  notice: "\x1B[43m",
+  info: "\x1B[46m",
+  debug: "\x1B[45m"
+};
+var custom = import_winston.format.printf((data) => {
+  const message = `${COLORS[data.level]} ${data.level.toUpperCase()} \x1B[0m ${data.message}`;
+  return !data.data ? message : message + `
+${JSON.stringify(data)}`;
+});
+if (process.env.BUILD !== "prod") {
+  logger.add(new import_winston.transports.Console({ format: import_winston.format.combine(custom), level: "debug" }));
+}
+
+// src/utils/errors.ts
+var DefaultError = class extends Error {
+  constructor(message, options = {}) {
+    super(message);
+    this.status = options.status || 400;
+    this.level = options.level || "error";
+    this.data = options.data || {};
+    this.description = options.description || {};
+    this.UIDescription = options.UIDescription || {};
+    this.errors = options.errors;
+    this.path = options.path || this.stack;
+    this.details = options.details || [];
+    this.log();
+  }
+  log() {
+    const log = {
+      level: this.level || "error",
+      message: this.message,
+      path: this.path,
+      data: {}
+    };
+    if (this.data && Object.keys(this.data).length)
+      log.data = this.data;
+    logger.log(log);
+  }
+};
+var UnknownError = class extends DefaultError {
+  constructor(params = {}) {
+    const data = {
+      description: {
+        "en": "An unexpected error occurred while processing your request. Please try again later or contact our support team for assistance.",
+        "pt-br": "Um erro inesperado ocorreu enquanto seu pedido era processado. Por favor, tente novamente mais tarde ou entre em contato com o suporte."
+      },
+      status: 500,
+      level: "emergency",
+      UIDescription: {
+        "pt-br": "Um imprevisto ocorreu."
+      }
+    };
+    if (params.path)
+      data.path = params.path;
+    super("Internal Server Error", data);
+  }
+};
+var DuplicateConflictError = class extends DefaultError {
+  constructor(params = {}) {
+    super("Duplicate conflict.", {
+      description: {
+        "en": "The request can not be completed because the resource or process already exists.",
+        "pt-br": "A solicita\xE7\xE3o n\xE3o pode ser conclu\xEDda pois o recurso ou processo j\xE1 existe"
+      },
+      level: "notice",
+      status: params.status || 409,
+      data: params.data || {},
+      UIDescription: params.UIDescription || {
+        "pt-br": "O objeto ou processo j\xE1 existe ou est\xE1 duplicado."
+      }
+    });
+  }
+};
+var ResourceNotFoundError = class extends DefaultError {
+  constructor(params = {}) {
+    super("Resource not found.", {
+      description: {
+        "en": "The server could not find the requested resource.",
+        "pt-br": "O servidor n\xE3o encontrou o recurso requisitado."
+      },
+      level: "notice",
+      status: params.status || 404,
+      data: params.data || {},
+      UIDescription: params.UIDescription || {
+        "pt-br": "O servidor n\xE3o conseguiu encontrar o recurso solicitado."
+      }
+    });
+  }
+};
+var ValidationError = class extends DefaultError {
+  constructor(params = {}) {
+    super("Invalid data.", {
+      description: params.description ? params.description : {
+        "en": "The request contains semantic errors or invalid data that prevents processing.",
+        "pt-br": "A solicita\xE7\xE3o cont\xE9m inconsist\xEAncias sem\xE2nticas ou dados inv\xE1lidos que est\xE3o impedindo o processamento adequado."
+      },
+      level: "warning",
+      status: params.status || 422,
+      data: params.data || {},
+      UIDescription: params.UIDescription || {
+        "pt-br": "A requisi\xE7\xE3o \xE9 invalida."
+      },
+      details: params.details || []
+    });
+  }
+};
+var AuthenticationError = class extends DefaultError {
+  constructor(params = {}) {
+    super("Request unauthorized.", {
+      description: {
+        "en": "The request requires user authentication or the authentication has failed.",
+        "pt-br": "A solicita\xE7\xE3o requer autentica\xE7\xE3o do usu\xE1rio ou a autentica\xE7\xE3o falhou."
+      },
+      level: "warning",
+      status: params.status || 401,
+      data: params.data || {},
+      UIDescription: params.UIDescription || {
+        "pt-br": "A solicita\xE7\xE3o requer autentica\xE7\xE3o do usu\xE1rio ou a autentica\xE7\xE3o falhou."
+      }
+    });
+  }
+};
+var AuthorizationError = class extends DefaultError {
+  constructor(params = {}) {
+    super("Action execution refused due to a permissions violation.", {
+      description: {
+        "en": "The server understood the request, but refuses to authorize it.",
+        "pt-br": "O servidor entendeu a solicita\xE7\xE3o, mas se recusa a autoriz\xE1-la."
+      },
+      status: params.status || 403,
+      data: params.data || {},
+      UIDescription: params.UIDescription || {
+        "pt-br": "A solicita\xE7\xE3o chegou, mas n\xE3o foi autorizada."
+      }
+    });
+  }
+};
+var DatabaseError = class extends DefaultError {
+  constructor(params = {}) {
+    super("An error occurred while accessing or querying the database.", {
+      description: {
+        "en": "An error occurred while accessing or querying the database.",
+        "pt-br": "Ocorreu um erro ao acessar ou consultar o banco de dados."
+      },
+      level: "critical",
+      status: params.status || 500,
+      data: params.data || {},
+      UIDescription: params.UIDescription || {
+        "pt-br": "Ocorreu um erro ao acessar o banco de dados."
+      }
+    });
+  }
+};
+
+// src/config/env.ts
+var import_dotenv = __toESM(require("dotenv"), 1);
+var import_path = __toESM(require("path"), 1);
+var import_zod = require("zod");
+import_dotenv.default.config({ path: import_path.default.resolve(process.cwd(), `.env.${process.env.NODE_ENV}`) });
+console.log(`=> API running with ${process.env.NODE_ENV?.toUpperCase() || "DEV"} environment!`);
+console.log("======================================");
+var DEFAULT_PORT = 7e3;
+var envSchema = import_zod.z.object({
+  NODE_ENV: import_zod.z.string().default("dev"),
+  PORT: import_zod.z.coerce.number().default(DEFAULT_PORT),
+  DB_NAME: import_zod.z.string().default("vdr"),
+  DB_URL: import_zod.z.string().default("mongodb://localhost:27017"),
+  REDIS_URL: import_zod.z.string().default("127.0.0.1"),
+  SECRET_AUTH: import_zod.z.string().default("1GH23jduihsSqFi6oedpniUask29OGpwmnSugGwziviIvoVNB3BF3daw5"),
+  EXPIRE_AUTH: import_zod.z.string().default("1d"),
+  FOCUS_NFE_BASE_URL: import_zod.z.string().default("https://homologacao.focusnfe.com.br/v2"),
+  FOCUS_NFE_TOKEN: import_zod.z.string().default("hb5mYGx64HAZEEqVkku1aE0jJ2SUg4YG"),
+  API_URL: import_zod.z.string().default(`http://localhost:${DEFAULT_PORT}`)
+});
+var _env = envSchema.safeParse(process.env);
+if (!_env.success) {
+  console.error("\u274C Invalid environment variables", _env.error.format());
+  throw new Error("Invalid environment varibles.");
+}
+var env = _env.data;
+console.log(env);
+
+// src/utils/decode-token.ts
+var import_jsonwebtoken = __toESM(require("jsonwebtoken"), 1);
+var decodeToken = (token) => import_jsonwebtoken.default.verify(token, env.SECRET_AUTH);
+
+// src/repositories/mongo/mongo-admins-repository.ts
+var MongoAdminsRepository = class {
+  async getByEmail(email) {
+    try {
+      const admin = await Admins.findOne({ email });
+      return admin;
+    } catch (e) {
+      throw new DatabaseError({ data: { email } });
+    }
+  }
+  async getById(_id) {
+    try {
+      const admin = await Admins.findOne({ _id });
+      return admin;
+    } catch (e) {
+      throw new DatabaseError({ data: { _id } });
+    }
+  }
+};
+
+// src/utils/generate-token.ts
+var import_jsonwebtoken2 = __toESM(require("jsonwebtoken"), 1);
+var generateToken = (data) => import_jsonwebtoken2.default.sign(data, env.SECRET_AUTH, { expiresIn: env.EXPIRE_AUTH });
+
+// src/use-cases/auth/create-session.ts
+var import_bcrypt = __toESM(require("bcrypt"), 1);
+var CreateSessionUseCase = class {
+  constructor(adminsRepository) {
+    this.adminsRepository = adminsRepository;
+  }
+  async execute({ email, password }) {
+    const admin = await this.adminsRepository.getByEmail(email);
+    if (!admin) {
+      throw new ResourceNotFoundError({ data: { email }, UIDescription: { "pt-br": "Esse e-mail n\xE3o est\xE1 vinculado a um usu\xE1rio!" } });
+    }
+    if (admin.status != "ACTIVE") {
+      throw new AuthorizationError({ data: { ...admin }, "UIDescription": { "pt-br": "Seu acesso foi bloqueado!" } });
+    }
+    const isPasswordCorrect = await import_bcrypt.default.compare(password, admin.password);
+    if (!isPasswordCorrect) {
+      throw new AuthenticationError({ data: { ...admin }, "UIDescription": { "pt-br": "Senha incorreta!" } });
+    }
+    const token = generateToken({ _id: admin._id });
+    return {
+      _id: admin._id,
+      name: admin.name,
+      email: admin.email,
+      token
+    };
+  }
+};
+
+// src/use-cases/auth/verify-session.ts
+var VerifySessionUseCase = class {
+  constructor(adminsRepository) {
+    this.adminsRepository = adminsRepository;
+  }
+  async execute({ token }) {
+    if (!token) {
+      throw new AuthenticationError();
+    }
+    const decode = decodeToken(token);
+    if (!decode._id) {
+      throw new AuthenticationError({ data: { token }, "UIDescription": { "pt-br": "Seu acesso expirou, fa\xE7a login novamente!" } });
+    }
+    const admin = await this.adminsRepository.getById(decode._id);
+    if (!admin) {
+      throw new ResourceNotFoundError({ data: { _id: decode._id }, UIDescription: { "pt-br": "Seu usu\xE1rio n\xE3o foi encontrado!" } });
+    }
+    if (admin.status != "ACTIVE") {
+      throw new AuthenticationError({ data: { ...admin }, "UIDescription": { "pt-br": "Seu acesso foi bloqueado!" } });
+    }
+    return {
+      _id: admin._id,
+      name: admin.name,
+      email: admin.email,
+      token: generateToken({ _id: admin._id })
+    };
+  }
+};
+
+// src/utils/validator.ts
+var Validator = class {
+  constructor(schema15) {
+    if (!schema15) {
+      throw new Error("schema must be provided in construct of Validator class");
+    }
+    this.schema = schema15;
+  }
+  parse(data = {}) {
+    try {
+      return this.schema.parse(data);
+    } catch (e) {
+      const error = e;
+      throw new ValidationError({ data, details: error.errors });
+    }
+  }
+};
+
+// src/http/controllers/auth/create-session.ts
+var import_zod2 = require("zod");
+var schema3 = import_zod2.z.object({
+  email: import_zod2.z.string().email().nonempty(),
+  password: import_zod2.z.string().nonempty()
+});
+async function createSession(request, response, next) {
+  try {
+    const adminsRepository = new MongoAdminsRepository();
+    if (request.body.token) {
+      const verifySessionUseCase = new VerifySessionUseCase(adminsRepository);
+      const data2 = await verifySessionUseCase.execute({ token: request.body.token });
+      return response.status(200).json(data2);
+    }
+    const validator = new Validator(schema3);
+    validator.parse(request.body);
+    const createSessionUseCase = new CreateSessionUseCase(adminsRepository);
+    const data = await createSessionUseCase.execute(request.body);
+    response.status(200).json(data);
+  } catch (e) {
+    next(e);
+  }
+}
+
+// src/use-cases/ceps/get-cep.ts
+var import_axios = __toESM(require("axios"), 1);
+var GetCepUseCase = class {
+  async execute({ cep }) {
+    const url = `${env.FOCUS_NFE_BASE_URL}/ceps/${cep}?token=${env.FOCUS_NFE_TOKEN}`;
+    const { data, status } = await import_axios.default.get(url, { validateStatus: () => true });
+    return { data, status };
+  }
+};
+
+// src/http/controllers/ceps/get-cep.ts
+async function getCep(request, response, next) {
+  try {
+    const getCepUseCase = new GetCepUseCase();
+    const { data, status } = await getCepUseCase.execute({ cep: request.params.cep });
+    return response.status(status || 200).json(data);
+  } catch (e) {
+    next(e);
+  }
+}
+
+// src/use-cases/cfops/get-cfop.ts
+var import_axios2 = __toESM(require("axios"), 1);
+var GetCfopUseCase = class {
+  async execute({ cfop }) {
+    const url = `${env.FOCUS_NFE_BASE_URL}/cfops/${cfop}?token=${env.FOCUS_NFE_TOKEN}`;
+    const { data, status } = await import_axios2.default.get(url, { validateStatus: () => true });
+    return { data, status };
+  }
+};
+
+// src/http/controllers/cfops/get-cfop.ts
+async function getCfop(request, response, next) {
+  try {
+    const getCfopUseCase = new GetCfopUseCase();
+    const { data, status } = await getCfopUseCase.execute({ cfop: request.params.cfop });
+    return response.status(status || 200).json(data);
+  } catch (e) {
+    next(e);
+  }
+}
+
+// src/use-cases/cnpjs/get-cnpj.ts
+var import_axios3 = __toESM(require("axios"), 1);
+var GetCnpjUseCase = class {
+  async execute({ cnpj }) {
+    const url = ` https://3S6IOjm4PAM4Tpvf8Typcva4IjxZieTB@api.focusnfe.com.br/v2/cnpjs/${cnpj}`;
+    const { data, status } = await import_axios3.default.get(url, { validateStatus: () => true });
+    return { data, status };
+  }
+};
+
+// src/http/controllers/cnpjs/get-cnpj.ts
+async function getCnpj(request, response, next) {
+  try {
+    const getCnpjUseCase = new GetCnpjUseCase();
+    const { data, status } = await getCnpjUseCase.execute({ cnpj: request.params.cnpj });
+    return response.status(status || 200).json(data);
+  } catch (e) {
+    next(e);
+  }
+}
+
+// src/models/cteos.ts
+var import_mongoose3 = require("mongoose");
+var schema4 = new import_mongoose3.Schema({
+  cnpj_emitente: String,
+  ref: String,
+  status: String,
+  status_sefaz: String,
+  chave: String,
+  numero: String,
+  serie: String,
+  modelo: String,
+  caminho_xml: String,
+  caminho_dacte: String,
+  mensagem_sefaz: String,
+  caminho_xml_carta_correcao: String,
+  requisicao: Object,
+  protocolo: Object,
+  requisicao_carta_correcao: Object,
+  protocolo_carta_correcao: Object
+}, { timestamps: true });
+var Cteos = (0, import_mongoose3.model)("Cteos", schema4);
+
+// src/repositories/mongo/mongo-cteos-repository.ts
+var MongoCteosRepository = class {
+  async create(data) {
+    try {
+      const cteos = new Cteos(data);
+      await cteos.save();
+      return cteos;
+    } catch (e) {
+      throw new DatabaseError({ data });
+    }
+  }
+  async get(options = {}) {
+    try {
+      const limit = options.limit || 10;
+      const skip = options.skip || 0;
+      const cteos = await Cteos.find(options.filter || {}, options.projection || {}).sort({ createdAt: -1 }).limit(limit).skip(skip).lean();
+      return cteos;
+    } catch (e) {
+      throw new DatabaseError();
+    }
+  }
+  async count(filter) {
+    try {
+      const cteos = await Cteos.count(filter || {});
+      return cteos;
+    } catch (e) {
+      throw new DatabaseError();
+    }
+  }
+  async update(query, data) {
+    try {
+      await Cteos.updateOne(query, data);
+    } catch (e) {
+      throw new DatabaseError({ data: { data, query } });
+    }
+  }
+};
+
+// src/models/vehicle.ts
+var import_mongoose4 = require("mongoose");
+var schema5 = new import_mongoose4.Schema({
+  name: {
+    type: String,
+    required: true
+  },
+  manufacturingYear: {
+    type: Number,
+    required: true
+  },
+  modelYear: {
+    type: Number,
+    required: true
+  },
+  //marca - modelo - versão
+  mmv: {
+    type: String,
+    required: true
+  },
+  taf: String,
+  nre: {
+    type: String,
+    required: true
+  },
+  renavam: {
+    type: String,
+    required: true
+  },
+  licensePlate: {
+    type: String,
+    required: true
+  },
+  uf: {
+    type: String,
+    required: true
+  },
+  type: {
+    type: String,
+    enum: ["1", "2"],
+    required: true
+  },
+  owner: {
+    cpf: String,
+    cnpj: String,
+    corporateName: {
+      type: String,
+      required: true
+    },
+    ie: {
+      type: String,
+      required: true
+    },
+    uf: {
+      type: String,
+      required: true
+    },
+    taf: {
+      type: String,
+      required: true
+    },
+    type: {
+      type: String,
+      enum: ["0", "1", "2"],
+      required: true
+    }
+  },
+  archivedAt: Date
+}, { timestamps: true });
+var Vehicles = (0, import_mongoose4.model)("Vehicles", schema5);
+
+// src/repositories/mongo/mongo-vehicles-repository.ts
+var MongoVehiclesRepository = class {
+  async create(data) {
+    try {
+      const vehicle = new Vehicles(data);
+      await vehicle.save();
+      return vehicle;
+    } catch (e) {
+      throw new DatabaseError({ data });
+    }
+  }
+  async update(_id, data) {
+    try {
+      const result = await Vehicles.updateOne({ _id }, data);
+      return result;
+    } catch (e) {
+      throw new DatabaseError({ data: { _id, ...data } });
+    }
+  }
+  async archive(_id) {
+    try {
+      const result = await Vehicles.updateOne({ _id }, { archivedAt: /* @__PURE__ */ new Date() });
+      return result;
+    } catch (e) {
+      throw new DatabaseError({ data: { _id } });
+    }
+  }
+  async get(query = {}) {
+    try {
+      const result = await Vehicles.find(query);
+      return result;
+    } catch (e) {
+      throw new DatabaseError();
+    }
+  }
+  async getById(_id) {
+    try {
+      const result = await Vehicles.findOne({ _id });
+      return result;
+    } catch (e) {
+      throw new DatabaseError();
+    }
+  }
+};
+
+// src/use-cases/cteos/create-cteos.ts
+var import_axios4 = __toESM(require("axios"), 1);
+var import_crypto = require("crypto");
+
+// src/use-cases/vehicles/get-vehicle.ts
+var GetVehicleUseCase = class {
+  constructor(repository) {
+    this.repository = repository;
+  }
+  async execute(_id) {
+    const vehicle = await this.repository.getById(_id);
+    if (!vehicle) {
+      throw new ResourceNotFoundError({ data: { _id } });
+    }
+    return vehicle;
+  }
+};
+
+// src/use-cases/cteos/create-cteos.ts
+var DEFAULT = {
+  "bairro_emitente": "Bela Uni\xE3o",
+  "cep_emitente": "98900000",
+  "cnpj_emitente": "05435582000152",
+  "codigo_municipio_emitente": "4317202",
+  "codigo_municipio_envio": "4317202",
+  "inscricao_estadual_emitente": "1100090700",
+  "codigo_pais_tomador": "1058",
+  "pais_tomador": "Brasil",
+  "icms_aliquota": "0.00",
+  "icms_base_calculo": "0.00",
+  "icms_situacao_tributaria": "90_simples_nacional",
+  "icms_indicador_simples_nacional": 1,
+  "icms_valor": "0.00",
+  "logradouro_emitente": "Rua Bela Uni\xE3o",
+  "modal": "01",
+  "municipio_emitente": "Santa Rosa",
+  "municipio_envio": "Santa Rosa",
+  "nome_emitente": "VDR PETRI TURISMO LTDA",
+  "nome_fantasia_emitente": "VDR PETRI TURISMO LTDA",
+  "numero_emitente": "1136",
+  "quantidade": "1.00",
+  "telefone_emitente": "5535116020",
+  "tipo_documento": 0,
+  "uf_emitente": "RS",
+  "uf_envio": "RS",
+  "valor_desconto_fatura": "0.00",
+  "valor_liquido_fatura": "1.00",
+  "valor_original_fatura": "1.00",
+  "valor_total_tributos": "0.00",
+  "valor_pis": "0.00",
+  "valor_cofins": "0.00"
+};
+var CreateCteosUseCase = class {
+  constructor(vehiclesRepository, cteosRepository) {
+    this.vehiclesRepository = vehiclesRepository;
+    this.cteosRepository = cteosRepository;
+  }
+  async execute(data) {
+    const getVehicleUseCase = new GetVehicleUseCase(this.vehiclesRepository);
+    const vehicle = await getVehicleUseCase.execute(data.modal_rodoviario);
+    const request = {
+      ...data,
+      ...DEFAULT,
+      data_emissao: (/* @__PURE__ */ new Date()).toISOString(),
+      numero_fatura: (0, import_crypto.randomUUID)(),
+      modal_rodoviario: {
+        numero_registro_estadual: vehicle.nre,
+        taf_proprietario: vehicle.owner.taf,
+        razao_social_proprietario: vehicle.owner.corporateName,
+        placa: vehicle.licensePlate,
+        renavam: vehicle.renavam,
+        inscricao_estadual_proprietario: vehicle.owner.ie,
+        tipo_fretamento: vehicle.type,
+        tipo_proprietario: vehicle.owner.type,
+        uf_licenciamento: vehicle.uf,
+        uf_proprietario: vehicle.owner.uf
+      }
+    };
+    if (vehicle.owner.cnpj) {
+      request.modal_rodoviario.cnpj_proprietario = vehicle.owner.cnpj;
+    }
+    if (vehicle.owner.cpf) {
+      request.modal_rodoviario.cpf_proprietario = vehicle.owner.cpf;
+    }
+    if (vehicle.taf && request.uf_fim != request.uf_inicio) {
+      request.modal_rodoviario.taf = vehicle.taf;
+      delete request.modal_rodoviario.numero_registro_estadual;
+    }
+    if (request.uf_inicio == request.uf_fim) {
+      delete request.modal_rodoviario.taf;
+    }
+    request.icms_indicador_simples_nacional = 0;
+    if (request.uf_fim == "RS") {
+      request.icms_reducao_base_calculo = "80.0";
+      request.icms_aliquota = "12.0";
+      request.icms_base_calculo = Number(request.valor_total) * 0.2;
+      request.icms_valor = request.icms_base_calculo * 0.12;
+      request.icms_situacao_tributaria = "20";
+      request.observacoes = request.observacoes + " - Redu\xE7\xE3o de Base de C\xE1lculo  de ICMS conforme Artigo 24, inciso I, do Livro I do RICMS/RS";
+    }
+    if (request.uf_fim != "RS") {
+      request.icms_situacao_tributaria = "00";
+      request.icms_base_calculo = Number(request.valor_total);
+      if (["MG", "PR", "RJ", "SC", "SP"].includes(request.uf_fim)) {
+        request.icms_aliquota = "12.0";
+        request.icms_valor = Number(request.valor_total) * 0.12;
+      } else {
+        request.icms_aliquota = "7.0";
+        request.icms_valor = Number(request.valor_total) * 0.07;
+      }
+    }
+    if (request.inscricao_estadual_tomador) {
+      request.cfop = "6353";
+    }
+    const ref2 = (0, import_crypto.randomUUID)();
+    console.log("------ REQUEST ----------");
+    console.log(request);
+    console.log(`${env.FOCUS_NFE_BASE_URL}/cte_os?ref=${ref2}&token=${env.FOCUS_NFE_TOKEN}`);
+    const response = await import_axios4.default.post(`${env.FOCUS_NFE_BASE_URL}/cte_os?ref=${ref2}&token=${env.FOCUS_NFE_TOKEN}`, request, { validateStatus: () => true });
+    if (Number(response.data.status_sefaz) >= 400 || response.status >= 400) {
+      return response;
+    }
+    let cteos = await this.cteosRepository.create({ ...response.data });
+    try {
+      const response2 = await import_axios4.default.get(`${env.FOCUS_NFE_BASE_URL}/cte/${ref2}?completa=1&token=${env.FOCUS_NFE_TOKEN}`);
+      await this.cteosRepository.update({ _id: String(cteos._id) }, { ...response2.data });
+      cteos = { ...cteos, ...response2.data };
+    } catch (e) {
+      console.log(e);
+    }
+    return {
+      status: 201,
+      data: cteos
+    };
+  }
+};
+
+// src/http/controllers/cteos/create-cteos.ts
+var import_zod3 = require("zod");
+var schema6 = import_zod3.z.object({
+  cfop: import_zod3.z.string().nonempty(),
+  bairro_tomador: import_zod3.z.string().nonempty(),
+  logradouro_tomador: import_zod3.z.string().nonempty(),
+  cep_tomador: import_zod3.z.string().nonempty(),
+  codigo_municipio_tomador: import_zod3.z.string().nonempty(),
+  municipio_tomador: import_zod3.z.string().nonempty(),
+  uf_tomador: import_zod3.z.string().nonempty(),
+  numero_tomador: import_zod3.z.string().nonempty(),
+  cnpj_tomador: import_zod3.z.string().optional(),
+  cpf_tomador: import_zod3.z.string().optional(),
+  nome_fantasia_tomador: import_zod3.z.string().nonempty(),
+  nome_tomador: import_zod3.z.string().nonempty(),
+  codigo_municipio_fim: import_zod3.z.string().nonempty(),
+  codigo_municipio_inicio: import_zod3.z.string().nonempty(),
+  descricao_servico: import_zod3.z.string().nonempty(),
+  indicador_inscricao_estadual_tomador: import_zod3.z.string().nonempty(),
+  municipio_fim: import_zod3.z.string().nonempty(),
+  municipio_inicio: import_zod3.z.string().nonempty(),
+  natureza_operacao: import_zod3.z.string().nonempty(),
+  tipo_servico: import_zod3.z.enum(["6", "7", "8"]),
+  uf_fim: import_zod3.z.string().nonempty(),
+  uf_inicio: import_zod3.z.string().nonempty(),
+  valor_receber: import_zod3.z.number().min(0),
+  valor_total: import_zod3.z.number().min(0),
+  modal_rodoviario: import_zod3.z.string().nonempty(),
+  percursos: import_zod3.z.array(import_zod3.z.unknown()).optional()
+});
+async function createCteos(request, response, next) {
+  try {
+    const validator = new Validator(schema6);
+    validator.parse(request.body);
+    const vehiclesRepository = new MongoVehiclesRepository();
+    const cteosRepository = new MongoCteosRepository();
+    const createCteosUseCase = new CreateCteosUseCase(vehiclesRepository, cteosRepository);
+    const result = await createCteosUseCase.execute(request.body);
+    response.status(result.status || 200).json(result.data);
+  } catch (e) {
+    next(e);
+  }
+}
+
+// src/use-cases/cteos/cancel-cteos.ts
+var import_axios6 = __toESM(require("axios"), 1);
+
+// src/use-cases/cteos/update-cteos.ts
+var import_axios5 = __toESM(require("axios"), 1);
+var UpdateCteosUseCase = class {
+  constructor(repository) {
+    this.repository = repository;
+  }
+  async execute(data) {
+    const response = await import_axios5.default.get(`${env.FOCUS_NFE_BASE_URL}/cte/${data.ref}?completa=1&token=${env.FOCUS_NFE_TOKEN}`);
+    await this.repository.update({ ref: data.ref }, { ...response.data });
+  }
+};
+
+// src/use-cases/cteos/cancel-cteos.ts
+var CancelCteosUseCase = class {
+  async execute({ ref: ref2, justificativa }) {
+    console.log(`${env.FOCUS_NFE_BASE_URL}/cte/${ref2}?token=${env.FOCUS_NFE_TOKEN}`, { justificativa });
+    const response = await import_axios6.default.delete(`${env.FOCUS_NFE_BASE_URL}/cte/${ref2}?token=${env.FOCUS_NFE_TOKEN}`, {
+      data: { justificativa },
+      headers: {
+        "Content-Type": "application/json"
+      },
+      validateStatus: () => true
+    });
+    if (response.status == 200) {
+      const mongoCteosRepository = new MongoCteosRepository();
+      const updateCteosUseCase = new UpdateCteosUseCase(mongoCteosRepository);
+      await updateCteosUseCase.execute({ ref: ref2 });
+    }
+    return response;
+  }
+};
+
+// src/http/controllers/cteos/delete-cteos.ts
+async function deleteCteos(request, response, next) {
+  try {
+    if (!request.params.id || !request.query.justificativa) {
+      throw new ValidationError();
+    }
+    const cancelCteosUseCase = new CancelCteosUseCase();
+    const { status, data } = await cancelCteosUseCase.execute({ ref: request.params.id, justificativa: request.query.justificativa });
+    response.status(status || 200).json(data);
+  } catch (e) {
+    next(e);
+  }
+}
+
+// src/use-cases/cteos/fetch-cteos.ts
+var FetchCteosUseCase = class {
+  constructor(repository) {
+    this.repository = repository;
+  }
+  async execute(query = {}) {
+    const [data, count] = await Promise.all([
+      this.repository.get(query),
+      this.repository.count(query?.filter || {})
+    ]);
+    return { data, count };
+  }
+};
+
+// src/http/controllers/cteos/fetch-cteos.ts
+async function fetchCteos(request, response, next) {
+  try {
+    const repository = new MongoCteosRepository();
+    const query = { ...request.query };
+    query.filter = {};
+    if (query.status) {
+      query.filter.status = query.status;
+      delete query.status;
+    }
+    if (query.name) {
+      query.filter.name = { $regex: query.name };
+      delete query.name;
+    }
+    if (query.since && query.to) {
+      query.filter.createdAt = { $gte: query.since, $lte: query.to };
+      delete query.since;
+      delete query.to;
+    }
+    const fetchCteosUseCase = new FetchCteosUseCase(repository);
+    const { data, count } = await fetchCteosUseCase.execute(query);
+    response.status(200).json({ data, count });
+  } catch (e) {
+    next(e);
+  }
+}
+
+// src/http/controllers/cteos/update-cteos.ts
+async function updateCteos(request, response, next) {
+  try {
+    console.log("\u2705 Recebeu um webhook!");
+    if (!request.body.ref) {
+      throw new ValidationError();
+    }
+    const cteosRepository = new MongoCteosRepository();
+    const updateCteosUseCase = new UpdateCteosUseCase(cteosRepository);
+    await updateCteosUseCase.execute({ ref: request.params.ref });
+    response.status(200).json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+}
+
+// src/use-cases/vehicles/create-vehicle.ts
+var CreateVehicleUseCase = class {
+  constructor(repository) {
+    this.repository = repository;
+  }
+  async execute(data) {
+    const vehicle = await this.repository.create(data);
+    return vehicle;
+  }
+};
+
+// src/http/controllers/vehicles/create-vehicle.ts
+var import_zod4 = require("zod");
+var schema7 = import_zod4.z.object({
+  type: import_zod4.z.enum(["1", "2"]),
+  nre: import_zod4.z.string().nonempty(),
+  renavam: import_zod4.z.string().nonempty(),
+  licensePlate: import_zod4.z.string().nonempty(),
+  uf: import_zod4.z.string().nonempty(),
+  name: import_zod4.z.string().nonempty(),
+  manufacturingYear: import_zod4.z.number().min(1950),
+  modelYear: import_zod4.z.number().min(1950),
+  //marca - modelo - versão
+  mmv: import_zod4.z.string().nonempty(),
+  taf: import_zod4.z.string().optional(),
+  owner: import_zod4.z.object({
+    cpf: import_zod4.z.string().optional(),
+    cnpj: import_zod4.z.string().optional(),
+    corporateName: import_zod4.z.string().nonempty(),
+    ie: import_zod4.z.string().nonempty(),
+    uf: import_zod4.z.string().nonempty(),
+    type: import_zod4.z.enum(["0", "1", "2"]),
+    taf: import_zod4.z.string().nonempty()
+  })
+});
+async function createVehicle(request, response, next) {
+  try {
+    const validator = new Validator(schema7);
+    validator.parse(request.body);
+    const vehiclesRepository = new MongoVehiclesRepository();
+    const createVehicleUseCase = new CreateVehicleUseCase(vehiclesRepository);
+    const data = await createVehicleUseCase.execute(request.body);
+    response.status(200).json(data);
+  } catch (e) {
+    console.log(e);
+    next(e);
+  }
+}
+
+// src/use-cases/vehicles/archive-vehicle.ts
+var ArchiveVehicleUseCase = class {
+  constructor(repository) {
+    this.repository = repository;
+  }
+  async execute(_id) {
+    await this.repository.archive(_id);
+  }
+};
+
+// src/http/controllers/vehicles/delete-vehicle.ts
+async function deleteVehicle(request, response, next) {
+  try {
+    if (!request.params.id) {
+      throw new ValidationError();
+    }
+    const vehiclesRepository = new MongoVehiclesRepository();
+    const archiveVehicleUseCase = new ArchiveVehicleUseCase(vehiclesRepository);
+    await archiveVehicleUseCase.execute(request.params.id);
+    response.status(200).json({ _id: request.params.id });
+  } catch (e) {
+    next(e);
+  }
+}
+
+// src/use-cases/vehicles/fetch-vehicles.ts
+var FetchVehiclesUseCase = class {
+  constructor(repository) {
+    this.repository = repository;
+  }
+  async execute() {
+    const vehicles = await this.repository.get({
+      archivedAt: { $exists: false }
+    });
+    return vehicles;
+  }
+};
+
+// src/http/controllers/vehicles/fetch-vehicles.ts
+async function fetchVehicles(request, response, next) {
+  try {
+    const vehiclesRepository = new MongoVehiclesRepository();
+    if (request.params.id) {
+      const getVehicleUseCase = new GetVehicleUseCase(vehiclesRepository);
+      const data2 = await getVehicleUseCase.execute(request.params.id);
+      return response.status(200).json(data2);
+    }
+    const fetchVehiclesUseCase = new FetchVehiclesUseCase(vehiclesRepository);
+    const data = await fetchVehiclesUseCase.execute();
+    response.status(200).json({ data });
+  } catch (e) {
+    next(e);
+  }
+}
+
+// src/use-cases/vehicles/update-vehicle.ts
+var UpdateVehicleUseCase = class {
+  constructor(repository) {
+    this.repository = repository;
+  }
+  async execute(_id, data) {
+    await this.repository.update(_id, data);
+  }
+};
+
+// src/http/controllers/vehicles/update-vehicle.ts
+var import_zod5 = require("zod");
+var schema8 = import_zod5.z.object({
+  type: import_zod5.z.enum(["1", "2"]).optional(),
+  taf: import_zod5.z.string().optional(),
+  renavam: import_zod5.z.string().optional(),
+  licensePlate: import_zod5.z.string().optional(),
+  uf: import_zod5.z.string().optional(),
+  owner: import_zod5.z.object({
+    cpf: import_zod5.z.string().optional(),
+    cnpj: import_zod5.z.string().optional(),
+    corporateName: import_zod5.z.string().optional(),
+    ie: import_zod5.z.string().optional(),
+    uf: import_zod5.z.string().optional(),
+    type: import_zod5.z.enum(["0", "1", "2"]).optional(),
+    taf: import_zod5.z.string().optional()
+  }),
+  nre: import_zod5.z.string().optional(),
+  name: import_zod5.z.string().optional(),
+  manufacturingYear: import_zod5.z.number().min(1950).optional(),
+  modelYear: import_zod5.z.number().min(1950).optional(),
+  mmv: import_zod5.z.string().optional()
+});
+async function updateVehicle(request, response, next) {
+  try {
+    if (!request.params.id) {
+      throw new ValidationError();
+    }
+    const validator = new Validator(schema8);
+    validator.parse(request.body);
+    const vehiclesRepository = new MongoVehiclesRepository();
+    const updateVehicleUseCase = new UpdateVehicleUseCase(vehiclesRepository);
+    await updateVehicleUseCase.execute(request.params.id, request.body);
+    response.status(200).json({ _id: request.params.id });
+  } catch (e) {
+    next(e);
+  }
+}
+
+// src/models/trip.ts
+var import_mongoose5 = require("mongoose");
+var schema9 = new import_mongoose5.Schema({
+  name: String,
+  description: String,
+  startAddress: {
+    postalCode: String,
+    city: String,
+    number: String,
+    state: String,
+    street: String,
+    country: String
+  },
+  endAddress: {
+    postalCode: String,
+    city: String,
+    number: String,
+    state: String,
+    street: String,
+    country: String
+  },
+  startDate: Date,
+  endDate: Date,
+  type: {
+    type: String,
+    enum: ["SCHEDULED", "CHARTER", "UNIVERSITY"]
+  },
+  vehicle: String,
+  passengers: [{
+    customer: String,
+    seat: String
+  }],
+  archivedAt: Date
+}, { timestamps: true });
+var Trips = (0, import_mongoose5.model)("Trips", schema9);
+
+// src/repositories/mongo/mongo-trips-repository.ts
+var MongoTripsRepository = class {
+  async create(data) {
+    try {
+      const trip = new Trips(data);
+      await trip.save();
+      return trip;
+    } catch (e) {
+      throw new DatabaseError({ data });
+    }
+  }
+  async update(_id, data) {
+    try {
+      const result = await Trips.updateOne({ _id }, data);
+      return result;
+    } catch (e) {
+      throw new DatabaseError({ data: { _id, ...data } });
+    }
+  }
+  async archive(_id) {
+    try {
+      const result = await Trips.updateOne({ _id }, { archivedAt: /* @__PURE__ */ new Date() });
+      return result;
+    } catch (e) {
+      throw new DatabaseError({ data: { _id } });
+    }
+  }
+  async get() {
+    try {
+      const result = await Trips.find();
+      return result;
+    } catch (e) {
+      throw new DatabaseError();
+    }
+  }
+  async getById(_id) {
+    try {
+      const result = await Trips.findOne({ _id });
+      return result;
+    } catch (e) {
+      throw new DatabaseError();
+    }
+  }
+};
+
+// src/use-cases/trips/create-trip.ts
+var CreateTripUseCase = class {
+  constructor(repository) {
+    this.repository = repository;
+  }
+  async execute(data) {
+    const trip = await this.repository.create(data);
+    return trip;
+  }
+};
+
+// src/http/controllers/trips/create-trip.ts
+var import_zod6 = require("zod");
+var addressSchema = import_zod6.z.object({
+  postalCode: import_zod6.z.string().optional(),
+  city: import_zod6.z.string().min(1),
+  number: import_zod6.z.string().min(1),
+  state: import_zod6.z.string().min(1),
+  street: import_zod6.z.string().min(1),
+  country: import_zod6.z.string().min(1)
+});
+var schema10 = import_zod6.z.object({
+  name: import_zod6.z.string().min(1),
+  description: import_zod6.z.string().min(1),
+  startAddress: addressSchema,
+  endAddress: addressSchema,
+  startDate: import_zod6.z.string(),
+  // Aceita datas no formato ISO 8601
+  endDate: import_zod6.z.string(),
+  type: import_zod6.z.enum(["SCHEDULED", "CHARTER", "UNIVERSITY"]),
+  vehicle: import_zod6.z.string().min(1),
+  passengers: import_zod6.z.array(
+    import_zod6.z.object({
+      seat: import_zod6.z.string().optional(),
+      customer: import_zod6.z.string().optional()
+    })
+  ).optional()
+});
+async function createTrip(request, response, next) {
+  try {
+    const validator = new Validator(schema10);
+    validator.parse(request.body);
+    const tripsRepository = new MongoTripsRepository();
+    const createTripUseCase = new CreateTripUseCase(tripsRepository);
+    const data = await createTripUseCase.execute({
+      ...request.body,
+      startDate: new Date(request.body.startDate),
+      endDate: new Date(request.body.endDate)
+    });
+    response.status(201).json(data);
+  } catch (e) {
+    next(e);
+  }
+}
+
+// src/use-cases/trips/archive-trip.ts
+var ArchiveTripUseCase = class {
+  constructor(repository) {
+    this.repository = repository;
+  }
+  async execute(_id) {
+    await this.repository.archive(_id);
+  }
+};
+
+// src/http/controllers/trips/delete-trip.ts
+async function deleteTrip(request, response, next) {
+  try {
+    if (!request.params.id) {
+      throw new ValidationError({
+        description: { en: "Trip _id must be provided" }
+      });
+    }
+    const tripsRepository = new MongoTripsRepository();
+    const archiveTripUseCase = new ArchiveTripUseCase(tripsRepository);
+    console.log(`Excluindo viagem com ID: ${request.params.id}`);
+    await archiveTripUseCase.execute(request.params.id);
+    console.log(`Viagem com ID ${request.params.id} exclu\xEDda com sucesso.`);
+    response.status(200).json({ _id: request.params.id });
+  } catch (e) {
+    next(e);
+  }
+}
+
+// src/use-cases/trips/fetch-trips.ts
+var FetchTripsUseCase = class {
+  constructor(repository) {
+    this.repository = repository;
+  }
+  async execute() {
+    const trips = await this.repository.get();
+    return trips;
+  }
+};
+
+// src/http/controllers/trips/fetch-trips.ts
+async function fetchTrips(request, response, next) {
+  try {
+    const tripsRepository = new MongoTripsRepository();
+    const fetchTripsUseCase = new FetchTripsUseCase(tripsRepository);
+    const data = await fetchTripsUseCase.execute();
+    response.status(200).json({ data });
+  } catch (e) {
+    next(e);
+  }
+}
+
+// src/use-cases/trips/update-trip.ts
+var UpdateTripUseCase = class {
+  constructor(repository) {
+    this.repository = repository;
+  }
+  async execute(_id, data) {
+    await this.repository.update(_id, data);
+  }
+};
+
+// src/http/controllers/trips/update-trip.ts
+var import_zod7 = require("zod");
+var addressSchema2 = import_zod7.z.object({
+  postalCode: import_zod7.z.string().min(1),
+  city: import_zod7.z.string().min(1),
+  number: import_zod7.z.string().min(1),
+  state: import_zod7.z.string().min(1),
+  street: import_zod7.z.string().min(1),
+  country: import_zod7.z.string().min(1)
+});
+var schema11 = import_zod7.z.object({
+  name: import_zod7.z.string().optional(),
+  description: import_zod7.z.string().optional(),
+  startAddress: addressSchema2.optional(),
+  endAddress: addressSchema2.optional(),
+  startDate: import_zod7.z.date().optional(),
+  endDate: import_zod7.z.date().optional(),
+  type: import_zod7.z.enum(["SCHEDULED", "CHARTER", "UNIVERSITY"]).optional(),
+  vehicle: import_zod7.z.custom().optional(),
+  passengers: import_zod7.z.array(import_zod7.z.object({
+    customer: import_zod7.z.string().min(1),
+    seat: import_zod7.z.string().min(1)
+  })).optional()
+});
+async function updateTrip(request, response, next) {
+  try {
+    if (!request.params.id) {
+      throw new ValidationError({ description: { "en": "Trip _id must be provided" } });
+    }
+    const validator = new Validator(schema11);
+    validator.parse(request.body);
+    const tripsRepository = new MongoTripsRepository();
+    const updateTripUseCase = new UpdateTripUseCase(tripsRepository);
+    await updateTripUseCase.execute(request.params.id, request.body);
+    response.status(200).json({ _id: request.params.id });
+  } catch (e) {
+    next(e);
+  }
+}
+
+// src/models/customer.ts
+var import_mongoose6 = require("mongoose");
+var file = new import_mongoose6.Schema({
+  name: String,
+  url: String,
+  size: Number,
+  type: String
+});
+var schema12 = new import_mongoose6.Schema({
+  archivedAt: Date,
+  name: {
+    type: String,
+    required: true
+  },
+  fantasyname: {
+    type: String
+    // required: false,
+  },
+  email: {
+    type: String
+    // required: false,
+  },
+  birthdate: {
+    type: String
+    // required: false,
+  },
+  cpf: {
+    type: String
+    // required: false,
+  },
+  cnpj: {
+    type: String
+    // required: false,
+  },
+  phone: {
+    type: String
+    // required: false,
+  },
+  rg: {
+    type: String
+    // required: false,
+  },
+  files: [
+    file
+  ],
+  address: {
+    cep: {
+      type: String
+      // required: false,
+    },
+    city: {
+      type: String
+      // required: false,
+    },
+    number: {
+      type: String
+      // required: false,
+    },
+    state: {
+      type: String
+      // required: false,
+    },
+    street: {
+      type: String
+      // required: false,
+    },
+    bairro: {
+      type: String
+      // required: false,
+    }
+  }
+}, { timestamps: true });
+var Customers = (0, import_mongoose6.model)("Customers", schema12);
+
+// src/repositories/mongo/mongo-customers-repository.ts
+var MongoCustumerRepository = class {
+  async create(data) {
+    try {
+      const customers = new Customers(data);
+      await customers.save();
+      return customers;
+    } catch (e) {
+      throw new DatabaseError({ data });
+    }
+  }
+  async update(_id, data) {
+    try {
+      const result = await Customers.updateOne({ _id }, data);
+      return result;
+    } catch (e) {
+      throw new DatabaseError({ data: { _id, ...data } });
+    }
+  }
+  async archive(_id) {
+    try {
+      const result = await Customers.updateOne({ _id }, { archivedAt: /* @__PURE__ */ new Date() });
+      return result;
+    } catch (e) {
+      throw new DatabaseError({ data: { _id } });
+    }
+  }
+  async get(query = {}) {
+    try {
+      const result = await Customers.find(query);
+      return result;
+    } catch (e) {
+      throw new DatabaseError();
+    }
+  }
+  async getById(_id) {
+    try {
+      const result = await Customers.findOne({ _id });
+      return result;
+    } catch (e) {
+      console.log("Aqui o erro", e);
+      throw new DatabaseError();
+    }
+  }
+  async getCpf(cpf) {
+    try {
+      const result = await Customers.findOne({ cpf });
+      return result;
+    } catch (e) {
+      throw new DatabaseError();
+    }
+  }
+  async getCnpj(cnpj) {
+    try {
+      const result = await Customers.findOne({ cnpj });
+      return result;
+    } catch (e) {
+      throw new DatabaseError();
+    }
+  }
+  async getPhone(phone) {
+    try {
+      const result = await Customers.findOne({ phone });
+      return result;
+    } catch (e) {
+      throw new DatabaseError();
+    }
+  }
+  async getRg(rg) {
+    try {
+      const result = await Customers.findOne({ rg });
+      return result;
+    } catch (e) {
+      throw new DatabaseError();
+    }
+  }
+  async getEmail(email) {
+    try {
+      const result = await Customers.findOne({ email });
+      return result;
+    } catch (e) {
+      throw new DatabaseError();
+    }
+  }
+};
+
+// src/use-cases/customers/create-customers.ts
+var CreateCustomerUseCase = class {
+  constructor(repository) {
+    this.repository = repository;
+  }
+  async execute(data) {
+    if (data.cpf) {
+      const buscaCpfExistente = await this.repository.getCpf(data.cpf);
+      if (buscaCpfExistente) {
+        throw new DuplicateConflictError({ UIDescription: { "pt-br": "Cpf j\xE1 existe com outro usu\xE1rio!" } });
+      }
+    }
+    if (data.cnpj) {
+      const buscaCnpjExistente = await this.repository.getCnpj(data.cnpj);
+      if (buscaCnpjExistente) {
+        throw new DuplicateConflictError({ UIDescription: { "pt-br": "Cnpj j\xE1 existe com outro usu\xE1rio!" } });
+      }
+    }
+    if (data.phone) {
+      const buscaPhoneExistente = await this.repository.getPhone(data.phone);
+      if (buscaPhoneExistente) {
+        throw new DuplicateConflictError({ UIDescription: { "pt-br": "Telefone j\xE1 existe com outro usu\xE1rio!" } });
+      }
+    }
+    if (data.rg) {
+      const buscaRgExistente = await this.repository.getRg(data.rg);
+      if (buscaRgExistente) {
+        throw new DuplicateConflictError({ UIDescription: { "pt-br": "RG j\xE1 existe com outro usu\xE1rio!" } });
+      }
+    }
+    if (data.email) {
+      const buscaEmailExistente = await this.repository.getEmail(data.email);
+      if (buscaEmailExistente) {
+        throw new DuplicateConflictError({ UIDescription: { "pt-br": "Email j\xE1 existe com outro usu\xE1rio!" } });
+      }
+    }
+    const customer = await this.repository.create(data);
+    return customer;
+  }
+};
+
+// src/http/controllers/customers/create-customer.ts
+var import_zod8 = require("zod");
+var schema13 = import_zod8.z.object({
+  name: import_zod8.z.string().nonempty(),
+  fantasyname: import_zod8.z.string().optional(),
+  email: import_zod8.z.string().optional(),
+  birthdate: import_zod8.z.string().optional(),
+  cpf: import_zod8.z.string().optional(),
+  cnpj: import_zod8.z.string().optional(),
+  phone: import_zod8.z.string().optional(),
+  rg: import_zod8.z.string().optional(),
+  address: import_zod8.z.object({
+    cep: import_zod8.z.string().optional(),
+    city: import_zod8.z.string().optional(),
+    number: import_zod8.z.string().optional(),
+    state: import_zod8.z.string().optional(),
+    street: import_zod8.z.string().optional(),
+    bairro: import_zod8.z.string().optional()
+  }).optional(),
+  files: import_zod8.z.array(import_zod8.z.object({
+    name: import_zod8.z.string().optional(),
+    url: import_zod8.z.string().optional(),
+    size: import_zod8.z.number().optional(),
+    type: import_zod8.z.string().optional()
+  })).optional()
+});
+async function createCustomer(request, response, next) {
+  try {
+    const validator = new Validator(schema13);
+    console.log("request.body", request.body);
+    validator.parse(request.body);
+    const customersRepository = new MongoCustumerRepository();
+    const createCustomerUseCase = new CreateCustomerUseCase(customersRepository);
+    const data = await createCustomerUseCase.execute(request.body);
+    response.status(200).json(data);
+  } catch (e) {
+    console.log(e);
+    next(e);
+  }
+}
+
+// src/use-cases/customers/fetch-customers.ts
+var FetchCustumersUseCase = class {
+  constructor(repository) {
+    this.repository = repository;
+  }
+  async execute() {
+    const customers = await this.repository.get({
+      archivedAt: { $exists: false }
+    });
+    return customers;
+  }
+};
+
+// src/use-cases/customers/get-customers.ts
+var GetCustomersUseCase = class {
+  constructor(repository) {
+    this.repository = repository;
+  }
+  async execute(_id) {
+    const customers = await this.repository.getById(_id);
+    if (!customers) {
+      throw new ResourceNotFoundError({ data: { _id } });
+    }
+    return customers;
+  }
+};
+
+// src/http/controllers/customers/fetch-customers.ts
+async function fetchCustomers(request, response, next) {
+  try {
+    const customersRepository = new MongoCustumerRepository();
+    if (request.params.id) {
+      const getCustomersUseCase = new GetCustomersUseCase(customersRepository);
+      const data2 = await getCustomersUseCase.execute(request.params.id);
+      return response.status(200).json(data2);
+    }
+    const fetchCustumersUseCase = new FetchCustumersUseCase(customersRepository);
+    const data = await fetchCustumersUseCase.execute();
+    response.status(200).json({ data });
+  } catch (e) {
+    next(e);
+  }
+}
+
+// src/use-cases/customers/update-customers.ts
+var UpdateCustomersUseCase = class {
+  constructor(repository) {
+    this.repository = repository;
+  }
+  async execute(_id, data) {
+    const customer = await this.repository.getById(_id);
+    console.log("customer", customer);
+    if (!customer) {
+      throw new Error("");
+    }
+    if (customer.cpf === data.cpf) {
+      delete data.cpf;
+    }
+    if (customer.cnpj === data.cnpj) {
+      delete data.cnpj;
+    }
+    if (customer.phone === data.phone) {
+      delete data.phone;
+    }
+    if (customer.rg === data.rg) {
+      delete data.rg;
+    }
+    if (customer.email === data.email) {
+      delete data.email;
+    }
+    if (data.cpf) {
+      const buscaCpfExistente = await this.repository.getCpf(data.cpf);
+      if (buscaCpfExistente) {
+        throw new DuplicateConflictError({ UIDescription: { "pt-br": "Cpf j\xE1 existe com outro usu\xE1rio!" } });
+      }
+    }
+    if (data.cnpj) {
+      const buscaCnpjExistente = await this.repository.getCnpj(data.cnpj);
+      if (buscaCnpjExistente) {
+        throw new DuplicateConflictError({ UIDescription: { "pt-br": "Cnpj j\xE1 existe com outro usu\xE1rio!" } });
+      }
+    }
+    if (data.phone) {
+      const buscaPhoneExistente = await this.repository.getPhone(data.phone);
+      if (buscaPhoneExistente) {
+        throw new DuplicateConflictError({ UIDescription: { "pt-br": "Telefone j\xE1 existe com outro usu\xE1rio!" } });
+      }
+    }
+    if (data.rg) {
+      const buscaRgExistente = await this.repository.getRg(data.rg);
+      if (buscaRgExistente) {
+        throw new DuplicateConflictError({ UIDescription: { "pt-br": "RG j\xE1 existe com outro usu\xE1rio!" } });
+      }
+    }
+    if (data.email) {
+      const buscaEmailExistente = await this.repository.getEmail(data.email);
+      if (buscaEmailExistente) {
+        throw new DuplicateConflictError({ UIDescription: { "pt-br": "Email j\xE1 existe com outro usu\xE1rio!" } });
+      }
+    }
+    await this.repository.update(_id, data);
+  }
+};
+
+// src/http/controllers/customers/update-customers.ts
+var import_zod9 = require("zod");
+var schema14 = import_zod9.z.object({
+  name: import_zod9.z.string().optional(),
+  fantasyname: import_zod9.z.string().optional(),
+  email: import_zod9.z.string().optional(),
+  birthdate: import_zod9.z.string().optional(),
+  cpf: import_zod9.z.string().optional(),
+  cnpj: import_zod9.z.string().optional(),
+  phone: import_zod9.z.string().optional(),
+  rg: import_zod9.z.string().optional(),
+  address: import_zod9.z.object({
+    cep: import_zod9.z.string().optional(),
+    city: import_zod9.z.string().optional(),
+    number: import_zod9.z.string().optional(),
+    bairro: import_zod9.z.string().optional(),
+    state: import_zod9.z.string().optional(),
+    street: import_zod9.z.string().optional()
+  }).optional(),
+  files: import_zod9.z.array(import_zod9.z.object({
+    name: import_zod9.z.string().optional(),
+    url: import_zod9.z.string().optional(),
+    size: import_zod9.z.number().optional(),
+    type: import_zod9.z.string().optional()
+  }).optional())
+});
+async function updateCustomer(request, response, next) {
+  try {
+    if (!request.params.id) {
+      throw new ValidationError();
+    }
+    const validator = new Validator(schema14);
+    console.log(request.body);
+    validator.parse(request.body);
+    const customersRepository = new MongoCustumerRepository();
+    const updateCustomersUseCase = new UpdateCustomersUseCase(customersRepository);
+    const getCustomerUseCase = new GetCustomersUseCase(customersRepository);
+    if (!request.query.deleteFiles) {
+      const customer = await getCustomerUseCase.execute(request.params.id);
+      console.log("customer", customer);
+      console.log("request.body", request.body);
+      if (request.body.files) {
+        request.body.files = [...customer.files, ...request.body.files];
+      }
+    }
+    await updateCustomersUseCase.execute(request.params.id, request.body);
+    response.status(200).json({ _id: request.params.id });
+  } catch (e) {
+    next(e);
+  }
+}
+
+// src/use-cases/customers/archive-customers.ts
+var ArchiveCustomerUseCase = class {
+  constructor(repository) {
+    this.repository = repository;
+  }
+  async execute(_id) {
+    await this.repository.archive(_id);
+    console.log("cheguei aqui");
+    console.log(_id);
+  }
+};
+
+// src/http/controllers/customers/delete-customer.ts
+var import_storage2 = require("firebase/storage");
+
+// src/http/controllers/customers/firebase.ts
+var import_app = require("firebase/app");
+var import_storage = require("firebase/storage");
+var firebaseConfig = {
+  apiKey: "AIzaSyDKppQY3GZuSj3eBkFSMQcQi5nl2FBNdGU",
+  authDomain: "imagens-63ad7.firebaseapp.com",
+  projectId: "imagens-63ad7",
+  storageBucket: "imagens-63ad7.appspot.com",
+  messagingSenderId: "346371836172",
+  appId: "1:346371836172:web:0469f8c69df6b846196129",
+  measurementId: "G-JBY3090JP9"
+};
+var app = (0, import_app.initializeApp)(firebaseConfig);
+var storage = (0, import_storage.getStorage)(app);
+
+// src/http/controllers/customers/delete-customer.ts
+async function deleteCustomer(request, response, next) {
+  try {
+    if (!request.params.id) {
+      throw new ValidationError();
+    }
+    const customerRepository = new MongoCustumerRepository();
+    const archiveCustomerUseCase = new ArchiveCustomerUseCase(customerRepository);
+    const getCustomerUseCase = new GetCustomersUseCase(customerRepository);
+    await archiveCustomerUseCase.execute(request.params.id);
+    const customer = await getCustomerUseCase.execute(request.params.id);
+    console.log("customer", customer);
+    customer.files.forEach(async (item) => {
+      if (item.url) {
+        try {
+          const storageRef = (0, import_storage2.ref)(storage, item.url);
+          await (0, import_storage2.deleteObject)(storageRef);
+        } catch (error) {
+          console.error("Erro ao deletar arquivo:", error);
+        }
+      } else {
+        console.log("Nenhuma imagem para deletar.");
+      }
+    });
+    response.status(200).json({ _id: request.params.id });
+  } catch (e) {
+    next(e);
+  }
+}
+
+// src/http/routes.ts
+var routes = (0, import_express.Router)();
+routes.get(
+  "/",
+  async (request, response, next) => {
+    response.status(200).json({ message: "Welcome to the VDR Petri API!!" });
+    console.log(next);
+  }
+);
+routes.post("/authenticate", createSession);
+routes.post("/vehicles", createVehicle);
+routes.get("/vehicles/:id*?", fetchVehicles);
+routes.delete("/vehicles/:id", deleteVehicle);
+routes.put("/vehicles/:id", updateVehicle);
+routes.post("/cteos", createCteos);
+routes.get("/cteos", fetchCteos);
+routes.post("/cteos/webhooks", updateCteos);
+routes.delete("/cteos/:id", deleteCteos);
+routes.get("/ceps/:cep", getCep);
+routes.get("/cfops/:cfop", getCfop);
+routes.get("/cfops/:cnpj", getCnpj);
+routes.get("/cnpjs/:cnpj", getCnpj);
+routes.post("/customers", createCustomer);
+routes.get("/customers/:id*?", fetchCustomers);
+routes.put("/customers/:id", updateCustomer);
+routes.delete("/customers/:id", deleteCustomer);
+routes.post("/trips", createTrip);
+routes.get("/trips/:id*?", fetchTrips);
+routes.put("/trips/:id", updateTrip);
+routes.delete("/trips/:id", deleteTrip);
+
+// src/app.ts
+var import_cors = __toESM(require("cors"), 1);
+
+// src/http/middlewares/error-handling.ts
+var error_handling_default = async (e, request, response, next) => {
+  const error = e instanceof DefaultError ? e : new UnknownError(e instanceof Error ? { path: e.stack } : {});
+  const message = {
+    error: error.message,
+    status: error.status
+  };
+  if (error.description["en"]) {
+    message.message = error.description["en"];
+  }
+  if (error?.details?.length) {
+    message.details = error.details;
+  }
+  if (request.get("ui-description")) {
+    const LANGUAGES = ["en", "pt-br"];
+    if (LANGUAGES.includes(String(request.headers["ui-language"]))) {
+      message.UIDescription = error.UIDescription[String(request.headers["ui-language"])];
+    }
+  }
+  return response.status(error.status || 400).json(message);
+};
+
+// src/app.ts
+import_dotenv2.default.config({ path: import_path2.default.resolve(process.cwd(), ".env.dev") });
+var app2 = (0, import_express2.default)();
+app2.use(import_express2.default.json());
+app2.use(import_express2.default.urlencoded({ extended: true }));
+app2.use("/public", import_express2.default.static("src/assets"));
+app2.use((0, import_cors.default)({ origin: "*" }));
+app2.use(routes);
+app2.use(error_handling_default);
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  app
+});
