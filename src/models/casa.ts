@@ -1,84 +1,115 @@
-import { IVehicle } from '@/@types/vehicle';
-import { model, Schema } from 'mongoose';
+import { ICasa } from '@/@types/casa'
+import { model, Schema } from 'mongoose'
 
-export const schema = new Schema<IVehicle>(
+export const schema = new Schema<ICasa>(
   {
+    _id: {
+      type: String,
+      required: false,
+    },
     name: {
-      type: String,
-      required: true,
-    },
-    manufacturingYear: {
-      type: Number,
-      required: true,
-    },
-    modelYear: {
-      type: Number,
-      required: true,
-    },
-    //marca - modelo - versão
-    mmv: {
-      type: String,
-      required: true,
-    },
-    taf: String,
-
-    nre: {
-      type: String,
-      required: true,
-    },
-    renavam: {
-      type: String,
-      required: true,
-    },
-    licensePlate: {
-      type: String,
-      required: true,
-    },
-    uf: {
-      type: String,
-      required: true,
-    },
-    type: {
-      type: String,
-      enum: ['1', '2'],
-      required: true,
-    },
-
-    color: {
       type: String,
       required: false,
     },
 
-    owner: {
-      cpf: String,
-      cnpj: String,
-      corporateName: {
-        type: String,
-        required: true,
-      },
-      ie: {
-        type: String,
-        required: true,
-      },
-      uf: {
-        type: String,
-        required: true,
-      },
-      taf: {
-        type: String,
-        required: true,
-      },
+    descriptionCapa: {
+      type: String,
+      required: false,
+    },
 
-      type: {
-        type: String,
-        enum: ['0', '1', '2'],
+    tipoLocacao: {
+      type: String,
+      required: true,
+    },
+
+    garagem: {
+      vagas: {
+        type: Number,
         required: true,
       },
     },
 
-    archivedAt: Date,
-  },
-  { timestamps: true },
-);
+    banheiro: {
+      banheiro: {
+        type: Number,
+        required: true,
+      },
+      lavabo: {
+        type: Number,
+        required: true,
+      },
+    },
 
-export const Vehicles = model('Vehicles', schema);
+    cozinha: {
+      type: Number,
+      required: true,
+    },
+    tipo: {
+      type: String,
+      required: true,
+    },
+    salas: {
+      type: String,
+      required: true,
+    },
+    dormitorio: {
+      dormitorio: {
+        type: Number,
+        required: true,
+      }, // quartos
+      suite: {
+        type: Number,
+        required: true,
+      }, // se for igual a 0 tratamos de não apresentar
+    },
+    sacada: {
+      type: Number,
+      required: true,
+    },
+    elevador: {
+      type: Boolean,
+      required: true,
+    },
+    areaServico: {
+      type: Boolean,
+      required: true,
+    }, // lavanderia
+    churrasqueira: {
+      type: Boolean,
+      required: true,
+    }, // churrasqueira
+    iframeLocalizacao: {
+      type: String,
+      required: true,
+    }, // codigo de incorporação
+    observacao: {
+      type: String,
+      required: true,
+    }, // observação caso necessário
+    metrosQuadrados: {
+      type: Number,
+      required: true,
+    }, // m²
+    valorLocacao: {
+      type: Number,
+      required: true,
+    },
+    codImovel: {
+      type: Number,
+      required: true,
+    },
+    createdAt: {
+      type: String,
+      required: true,
+    },
+    updatedAt: {
+      type: String,
+      required: true,
+    },
+
+    archivedAt: String,
+  },
+  { timestamps: true }
+)
+
+export const Casa = model('Casa', schema)

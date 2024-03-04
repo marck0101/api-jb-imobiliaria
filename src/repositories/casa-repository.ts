@@ -1,18 +1,18 @@
-import { IVehicle } from '@/@types/vehicle';
-import { UpdateWriteOpResult } from 'mongoose';
+import { ICasa } from '@/@types/casa'
+// import { UpdateWriteOpResult } from 'mongoose'
 
-export interface GetVehiclesQuery {
+export interface GetCasaQuery {
   archivedAt?: {
-    $exists: boolean;
-  };
+    $exists: boolean
+  }
 }
 
-export interface VehiclesRepository {
+export interface CasaRepository {
   create(
-    data: Omit<IVehicle, 'createdAt' | 'updatedAt' | '_id' | 'archivedAt'>,
-  ): Promise<IVehicle>;
-  update(_id: string, data: Partial<IVehicle>): Promise<UpdateWriteOpResult>;
-  archive(_id: string): Promise<UpdateWriteOpResult>;
-  get(query?: GetVehiclesQuery): Promise<Array<IVehicle>>;
-  getById(_id: string): Promise<IVehicle | null>;
+    data: Omit<ICasa, 'createdAt' | '_id' | 'archivedAt' | 'updatedAt'>
+  ): Promise<ICasa>
+  // update(_id: string, data: Partial<ICasa>): Promise<UpdateWriteOpResult>
+  // archive(_id: string): Promise<UpdateWriteOpResult>
+  // get(query?: GetCasaQuery): Promise<Array<ICasa>>
+  // getById(_id: string): Promise<ICasa | null>
 }
