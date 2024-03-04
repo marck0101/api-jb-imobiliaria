@@ -336,7 +336,7 @@ var DEFAULT_PORT = 7e3;
 var envSchema = import_zod.z.object({
   NODE_ENV: import_zod.z.string().default("dev"),
   PORT: import_zod.z.coerce.number().default(DEFAULT_PORT),
-  DB_NAME: import_zod.z.string().default("vdr"),
+  DB_NAME: import_zod.z.string().default("jbimobiliaria"),
   DB_URL: import_zod.z.string().default("mongodb://localhost:27017"),
   REDIS_URL: import_zod.z.string().default("127.0.0.1"),
   SECRET_AUTH: import_zod.z.string().default("1GH23jduihsSqFi6oedpniUask29OGpwmnSugGwziviIvoVNB3BF3daw5"),

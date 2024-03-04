@@ -1,24 +1,23 @@
-
-import dotenv from 'dotenv';
-import path from 'path';
+import dotenv from 'dotenv'
+import path from 'path'
 // dotenv.config({ path: path.resolve(process.cwd(), '.env.example') });
-dotenv.config({ path: path.resolve(process.cwd(), '.env.dev') });
+dotenv.config({ path: path.resolve(process.cwd(), '.env.dev') })
 
-import express from 'express';
-import { routes } from './http/routes';
-import cors from 'cors';
+import express from 'express'
+import { routes } from './http/routes'
+import cors from 'cors'
 
-import errorHandling from './http/middlewares/error-handling';
+import errorHandling from './http/middlewares/error-handling'
 // import { createUploadthingExpressHandler } from 'uploadthing/express';
 
-export const app = express();
+export const app = express()
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
 
-app.use('/public', express.static('src/assets'));
+app.use('/public', express.static('src/assets'))
 
-app.use(cors({ origin: '*' }));
+app.use(cors({ origin: '*' }))
 
-app.use(routes);
-app.use(errorHandling);
+app.use(routes)
+app.use(errorHandling)
