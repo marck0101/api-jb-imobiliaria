@@ -7,26 +7,40 @@ import { z } from 'zod'
 const schema = z.object({
   _id: z.string().optional(),
   name: z.string().optional(),
-  // descriptionCapa: z.string().optional(),
-  // tipoLocacao: z.string().optional(),
-  // garagem: z.string().optional(),
-  // banheiro: z.string().optional(),
-  // cozinha: z.string().optional(),
-  // tipo: z.number().optional(),
-  // salas: z.string().optional(),
-  // dormitorio: z.string().optional(),
-  // sacada: z.string().optional(),
-  // elevador: z.string().optional(),
-  // areaServico: z.string().optional(),
-  // churrasqueira: z.string().optional(),
-
-  // iframeLocalizacao: z.string().optional(),
-  // observacao: z.string().optional(),
-  // metrosQuadrados: z.string().optional(),
-  // valorLocacao: z.string().optional(),
-  // codImovel: z.string().optional(),
+  descriptionCapa: z.string().optional(),
+  tipoLocacao: z.string().optional(),
+  garagem: z
+    .object({
+      vagas: z.number(),
+    })
+    .optional(),
+  banheiro: z
+    .object({
+      banheiro: z.number(),
+      lavabo: z.number(),
+    })
+    .optional(),
+  cozinha: z.number().optional(),
+  tipo: z.string().optional(),
+  salas: z.string().optional(),
+  dormitorio: z
+    .object({
+      dormitorio: z.number(),
+      suite: z.number(),
+    })
+    .optional(),
+  sacada: z.number().optional(),
+  elevador: z.boolean().optional(),
+  areaServico: z.boolean().optional(),
+  churrasqueira: z.boolean().optional(),
+  iframeLocalizacao: z.string().optional(),
+  observacao: z.string().optional(),
+  metrosQuadrados: z.number().optional(),
+  valorLocacao: z.number().optional(),
+  codImovel: z.number().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
+  archivedAt: z.string().optional(),
 })
 
 export async function createCasa(
