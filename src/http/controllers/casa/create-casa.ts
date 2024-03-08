@@ -1,8 +1,8 @@
-import { MongoCasaRepository } from '@/repositories/mongo/mongo-casa-repository'
-import { CreateCasaUseCase } from '@/use-cases/Casa/create-casa'
-import { Validator } from '@/utils/validator'
-import { NextFunction, Request, Response } from 'express'
-import { z } from 'zod'
+import { MongoCasaRepository } from '@/repositories/mongo/mongo-casa-repository';
+import { CreateCasaUseCase } from '@/use-cases/Casa/create-casa';
+import { Validator } from '@/utils/validator';
+import { NextFunction, Request, Response } from 'express';
+import { z } from 'zod';
 
 const schema = z.object({
   _id: z.string().optional(),
@@ -38,30 +38,29 @@ const schema = z.object({
   metrosQuadrados: z.number().optional(),
   valorLocacao: z.number().optional(),
   codImovel: z.number().optional(),
-  createdAt: z.string().optional(),
-  updatedAt: z.string().optional(),
+
   archivedAt: z.string().optional(),
-})
+});
 
 export async function createCasa(
   request: Request,
   response: Response,
-  next: NextFunction
+  next: NextFunction,
 ) {
   try {
     // console.log('request.body', request.body);
-    const validator = new Validator(schema)
-    validator.parse(request.body)
-    console.log('request.body', request.body)
+    const validator = new Validator(schema);
+    validator.parse(request.body);
+    console.log('request.body', request.body);
 
-    const casaRepository = new MongoCasaRepository()
-    const createCasaUseCase = new CreateCasaUseCase(casaRepository)
+    const casaRepository = new MongoCasaRepository();
+    const createCasaUseCase = new CreateCasaUseCase(casaRepository);
 
-    const data = await createCasaUseCase.execute(request.body)
+    const data = await createCasaUseCase.execute(request.body);
 
-    response.status(200).json(data)
+    response.status(200).json(data);
   } catch (e) {
-    console.log(e)
-    next(e)
+    console.log(e);
+    next(e);
   }
 }

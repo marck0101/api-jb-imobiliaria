@@ -1,12 +1,8 @@
-import { ICasa } from '@/@types/casa'
-import { model, Schema } from 'mongoose'
+import { ICasa } from '@/@types/casa';
+import { model, Schema } from 'mongoose';
 
 export const schema = new Schema<ICasa>(
   {
-    _id: {
-      type: String,
-      required: false,
-    },
     name: {
       type: String,
       required: false,
@@ -98,18 +94,10 @@ export const schema = new Schema<ICasa>(
       type: Number,
       required: true,
     },
-    createdAt: {
-      type: String,
-      required: true,
-    },
-    updatedAt: {
-      type: String,
-      required: true,
-    },
 
     archivedAt: String,
   },
-  { timestamps: true }
-)
+  { timestamps: true },
+);
 
-export const Casa = model('Casa', schema)
+export const Casa = model('Casa', schema);
