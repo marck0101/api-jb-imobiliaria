@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { createSession } from './controllers/auth/create-session';
 import { createCasa } from './controllers/casa';
+import { fetchCasa } from './controllers/casa/fetch-casa';
 
 export const routes = Router();
 
@@ -16,3 +17,4 @@ routes.get(
 
 routes.post('/authenticate', createSession);
 routes.post('/home', createCasa);
+routes.get('/home', fetchCasa);

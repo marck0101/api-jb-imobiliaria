@@ -1,17 +1,13 @@
-import { IVehicle } from '@/@types/vehicle';
-import { VehiclesRepository } from '@/repositories/vehicles-repository';
+import { ICasa } from '@/@types/casa';
+import { CasaRepository } from '@/repositories/casa-repository';
 
-export class FetchVehiclesUseCase {
+export class FetchCasaUseCase {
+  constructor(private repository: CasaRepository) {}
 
-    constructor(
-        private repository: VehiclesRepository,
-    ) { }
-
-    async execute(): Promise<Array<IVehicle>> {
-        const vehicles = await this.repository.get({
-            archivedAt: { $exists: false }
-        });
-        return vehicles;
-    }
-
+  async execute(): Promise<Array<ICasa>> {
+    const casa = await this.repository.get({
+      archivedAt: { $exists: false },
+    });
+    return casa;
+  }
 }
