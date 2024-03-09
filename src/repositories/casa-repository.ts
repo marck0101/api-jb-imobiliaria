@@ -7,7 +7,7 @@ export interface GetCasaQuery {
   };
 }
 
-export interface CasaRepository {
+export interface ICasaRepository {
   create(
     data: Omit<ICasa, 'createdAt' | '_id' | 'archivedAt' | 'updatedAt'>,
   ): Promise<ICasa>;
