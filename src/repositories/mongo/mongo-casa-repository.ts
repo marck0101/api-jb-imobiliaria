@@ -1,9 +1,9 @@
 import { DatabaseError } from '@/utils';
-import { ICasaRepository } from '../casa-repository';
+import { CasaRepository } from '../casa-repository';
 import { ICasa } from '@/@types/casa';
 import { Casa } from '@/models/casa';
 
-export class MongoCasaRepository implements ICasaRepository {
+export class MongoCasaRepository implements CasaRepository {
   async create(
     data: Omit<ICasa, 'createdAt' | 'updatedAt' | '_id' | 'archivedAt'>,
   ) {
@@ -18,7 +18,7 @@ export class MongoCasaRepository implements ICasaRepository {
     }
   }
 
-  async get(options: ICasaRepository.GetParams = {}) {
+  async get(options: CasaRepository.GetParams = {}) {
     try {
       const limit = options.limit || 10;
       const skip = options.skip || 0;
@@ -67,7 +67,7 @@ export class MongoCasaRepository implements ICasaRepository {
   }
 
   async update(
-    query: ICasaRepository.UpdateParams,
+    query: CasaRepository.UpdateParams,
     data: Partial<Omit<ICasa, 'createdAt' | 'updatedAt' | '_id'>>,
   ) {
     try {
