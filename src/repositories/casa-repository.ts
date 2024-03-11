@@ -25,6 +25,9 @@ export declare namespace ICasaRepository {
 
   export interface GetFilterParams {
     createdAt?: { $gte: Date; $lte: Date };
+    archivedAt?: {
+      $exists: boolean;
+    };
   }
 
   export interface GetCasaQuery {
@@ -38,8 +41,12 @@ export interface CasaRepository {
   create(
     data: Omit<ICasa, 'createdAt' | '_id' | 'archivedAt' | 'updatedAt'>,
   ): Promise<ICasa>;
-  update(_id: string, data: Partial<ICasa>): Promise<UpdateWriteOpResult>;
   archive(_id: string): Promise<UpdateWriteOpResult>;
+  update(_id: string, data: Partial<ICasa>): Promise<UpdateWriteOpResult>;
+  count(params?: ICasaRepository.GetFilterParams): Promise<number>;
+
   get(query?: ICasaRepository.GetCasaQuery): Promise<Array<ICasa>>;
   getById(_id: string): Promise<ICasa | null>;
+
+  getCasa(casa: string): Promise<Array<ICasa>>;
 }

@@ -1,9 +1,9 @@
 import { DatabaseError } from '@/utils';
-import { CasaRepository } from '../casa-repository';
+import { ICasaRepository } from '../casa-repository';
 import { ICasa } from '@/@types/casa';
 import { Casa } from '@/models/casa';
 
-export class MongoCasaRepository implements CasaRepository {
+export class MongoCasaRepository {
   async create(
     data: Omit<ICasa, 'createdAt' | 'updatedAt' | '_id' | 'archivedAt'>,
   ) {
@@ -18,7 +18,28 @@ export class MongoCasaRepository implements CasaRepository {
     }
   }
 
-  async get(options: CasaRepository.GetParams = {}) {
+  async update(
+    query: ICasaRepository.UpdateParams,
+    data: Partial<Omit<ICasa, 'createdAt' | 'updatedAt' | '_id'>>,
+  ) {
+    try {
+      await Casa.updateOne(query, data);
+    } catch (e) {
+      throw new DatabaseError({ data: { data, query } });
+    }
+  }
+
+  async archive(_id: string) {
+    try {
+      // console.log('arquivando _id', _id);
+      const result = await Casa.updateOne({ _id }, { archivedAt: new Date() });
+      return result;
+    } catch (e) {
+      throw new DatabaseError({ data: { _id } });
+    }
+  }
+
+  async get(options: ICasaRepository.GetParams = {}) {
     try {
       const limit = options.limit || 10;
       const skip = options.skip || 0;
@@ -29,7 +50,7 @@ export class MongoCasaRepository implements CasaRepository {
       if (options) {
         filter.archivedAt = { $exists: false };
 
-        const trips = await Casa.find(
+        const casa = await Casa.find(
           options.filter || {},
           options.projection || {},
         )
@@ -37,11 +58,20 @@ export class MongoCasaRepository implements CasaRepository {
           .limit(limit)
           .skip(skip)
           .lean();
-        return trips;
+        return casa;
       } else {
         const result = await Casa.find(filter);
         return result;
       }
+    } catch (e) {
+      throw new DatabaseError();
+    }
+  }
+
+  async count(filter: ICasaRepository.GetFilterParams) {
+    try {
+      const casa = await Casa.count(filter || {});
+      return casa;
     } catch (e) {
       throw new DatabaseError();
     }
@@ -56,24 +86,16 @@ export class MongoCasaRepository implements CasaRepository {
     }
   }
 
-  async archive(_id: string) {
+  async getCasa(casa: string) {
     try {
-      // console.log('arquivando _id', _id);
-      const result = await Casa.updateOne({ _id }, { archivedAt: new Date() });
+      // console.log('mongo casa repository');
+      const result = await Casa.find({
+        casa,
+        archivedAt: { $exists: false },
+      });
       return result;
-    } catch (e) {
-      throw new DatabaseError({ data: { _id } });
-    }
-  }
-
-  async update(
-    query: CasaRepository.UpdateParams,
-    data: Partial<Omit<ICasa, 'createdAt' | 'updatedAt' | '_id'>>,
-  ) {
-    try {
-      await Casa.updateOne(query, data);
-    } catch (e) {
-      throw new DatabaseError({ data: { data, query } });
+    } catch (error) {
+      throw new DatabaseError();
     }
   }
 }
