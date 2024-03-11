@@ -18,26 +18,26 @@ export class MongoCasaRepository {
     }
   }
 
-  async update(
-    query: ICasaRepository.UpdateParams,
-    data: Partial<Omit<ICasa, 'createdAt' | 'updatedAt' | '_id'>>,
-  ) {
-    try {
-      await Casa.updateOne(query, data);
-    } catch (e) {
-      throw new DatabaseError({ data: { data, query } });
-    }
-  }
+  // async update(
+  //   query: ICasaRepository.UpdateParams,
+  //   data: Partial<Omit<ICasa, 'createdAt' | 'updatedAt' | '_id'>>,
+  // ) {
+  //   try {
+  //     await Casa.updateOne(query, data);
+  //   } catch (e) {
+  //     throw new DatabaseError({ data: { data, query } });
+  //   }
+  // }
 
-  async archive(_id: string) {
-    try {
-      // console.log('arquivando _id', _id);
-      const result = await Casa.updateOne({ _id }, { archivedAt: new Date() });
-      return result;
-    } catch (e) {
-      throw new DatabaseError({ data: { _id } });
-    }
-  }
+  // async archive(_id: string) {
+  //   try {
+  //     // console.log('arquivando _id', _id);
+  //     const result = await Casa.updateOne({ _id }, { archivedAt: new Date() });
+  //     return result;
+  //   } catch (e) {
+  //     throw new DatabaseError({ data: { _id } });
+  //   }
+  // }
 
   async get(options: ICasaRepository.GetParams = {}) {
     try {
@@ -68,34 +68,34 @@ export class MongoCasaRepository {
     }
   }
 
-  async count(filter: ICasaRepository.GetFilterParams) {
-    try {
-      const casa = await Casa.count(filter || {});
-      return casa;
-    } catch (e) {
-      throw new DatabaseError();
-    }
-  }
+  // async count(filter: ICasaRepository.GetFilterParams) {
+  //   try {
+  //     const casa = await Casa.count(filter || {});
+  //     return casa;
+  //   } catch (e) {
+  //     throw new DatabaseError();
+  //   }
+  // }
 
-  async getById(_id: string) {
-    try {
-      const result = await Casa.findOne({ _id });
-      return result;
-    } catch (e) {
-      throw new DatabaseError();
-    }
-  }
+  // async getById(_id: string) {
+  //   try {
+  //     const result = await Casa.findOne({ _id });
+  //     return result;
+  //   } catch (e) {
+  //     throw new DatabaseError();
+  //   }
+  // }
 
-  async getCasa(casa: string) {
-    try {
-      // console.log('mongo casa repository');
-      const result = await Casa.find({
-        casa,
-        archivedAt: { $exists: false },
-      });
-      return result;
-    } catch (error) {
-      throw new DatabaseError();
-    }
-  }
+  // async getCasa(casa: string) {
+  //   try {
+  //     // console.log('mongo casa repository');
+  //     const result = await Casa.find({
+  //       casa,
+  //       archivedAt: { $exists: false },
+  //     });
+  //     return result;
+  //   } catch (error) {
+  //     throw new DatabaseError();
+  //   }
+  // }
 }

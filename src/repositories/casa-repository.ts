@@ -41,12 +41,12 @@ export interface CasaRepository {
   create(
     data: Omit<ICasa, 'createdAt' | '_id' | 'archivedAt' | 'updatedAt'>,
   ): Promise<ICasa>;
-  archive(_id: string): Promise<UpdateWriteOpResult>;
-  update(_id: string, data: Partial<ICasa>): Promise<UpdateWriteOpResult>;
-  count(params?: ICasaRepository.GetFilterParams): Promise<number>;
-
+  // update(_id: string, data: Partial<ICasa>): Promise<UpdateWriteOpResult>;
+  // archive(_id: string): Promise<UpdateWriteOpResult>;
   get(query?: ICasaRepository.GetCasaQuery): Promise<Array<ICasa>>;
-  getById(_id: string): Promise<ICasa | null>;
+  // count(params?: ICasaRepository.GetFilterParams): Promise<number>;
 
-  getCasa(casa: string): Promise<Array<ICasa>>;
+  // getById(_id: string): Promise<ICasa | null>;
+
+  // getCasa(casa: string): Promise<Array<ICasa>>;
 }
